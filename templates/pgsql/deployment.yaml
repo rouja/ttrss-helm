@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ttrss-helm.pgsql.fullname" . }}
+  labels:
+    {{- include "ttrss-helm.pgsql.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ttrss-helm.pgsql.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ttrss-helm.pgsql.selectorLabels" . | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      securityContext:
+        {{- toYaml .Values.pgsql.podSecurityContext | nindent 8 }}
+      containers:
+        - name: pgsql
+          securityContext:
+            {{- toYaml .Values.pgsql.securityContext | nindent 12 }}
+          image: "{{ .Values.pgsql.image.repository }}:{{ .Values.pgsql.image.tag }}"
+          imagePullPolicy: {{ .Values.pgsql.image.pullPolicy }}
+          envFrom:
+          - secretRef:
+              name: {{ include "ttrss-helm.pgsql.fullname" . }}
+          ports:
+            - name: pgsql
+              containerPort: 5432
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.pgsql.resources | nindent 12 }}
+          {{- if .Values.pgsql.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          {{- end }}
+      {{- if .Values.pgsql.persistence.enabled }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "ttrss-helm.pgsql.fullname" . }}
+      {{- end }}
+      {{- with .Values.pgsql.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.pgsql.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.pgsql.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

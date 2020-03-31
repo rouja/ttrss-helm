@@ -1,0 +1,21 @@
+{{- if .Values.pgsql.persistence.enabled }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "ttrss-helm.pgsql.fullname" . }}
+  labels:
+    {{- include "ttrss-helm.pgsql.labels" . | nindent 4 }}
+{{- if .Values.pgsql.persistence.annotations }}
+  annotations:
+{{ toYaml .Values.pgsql.persistence.annotations | indent 4 }}
+{{- end }}
+spec:
+  accessModes:
+    - {{ .Values.pgsql.persistence.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.pgsql.persistence.size | quote }}
+{{- if .Values.pgsql.persistence.storageClass }}
+  storageClassName: "{{ .Values.pgsql.persistence.storageClass }}"
+{{- end }}
+{{- end }}

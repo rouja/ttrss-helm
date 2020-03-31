@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ttrss-helm.ttrss.fullname" . }}
+  labels:
+    {{- include "ttrss-helm.ttrss.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ttrss-helm.ttrss.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ttrss-helm.ttrss.selectorLabels" . | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      securityContext:
+        {{- toYaml .Values.ttrss.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-ngix
+          image: "{{ .Values.ttrss.image.repository }}:{{ .Values.ttrss.image.tag }}"
+          imagePullPolicy: {{ .Values.ttrss.image.pullPolicy }}
+          command: 
+            - "/bin/sh"
+            - "-c"
+            - |
+              cp -R /var/www/html/tt-rss /mnt/tmp/;
+              chgrp 101 /mnt/tmp/tt-rss;
+              chgrp -R 101 /mnt/tmp/tt-rss/cache/images;
+              chgrp -R 101 /mnt/tmp/tt-rss/cache/upload;
+              chgrp -R 101 /mnt/tmp/tt-rss/cache/export;
+              chgrp -R 101 /mnt/tmp/tt-rss/feed-icons;
+              chgrp -R 101 /mnt/tmp/tt-rss/lock;
+              chmod -R 775 /mnt/tmp/tt-rss/cache/images;
+              chmod -R 775 /mnt/tmp/tt-rss/cache/upload;
+              chmod -R 775 /mnt/tmp/tt-rss/cache/export;
+              chmod -R 775 /mnt/tmp/tt-rss/feed-icons;
+              chmod -R 775 /mnt/tmp/tt-rss/lock;
+              chmod 775 /mnt/tmp/tt-rss;
+          volumeMounts:
+          - name: data
+            mountPath: /mnt/tmp
+      containers:
+        - name: ttrss
+          securityContext:
+            {{- toYaml .Values.ttrss.securityContext | nindent 12 }}
+          image: "{{ .Values.ttrss.image.repository }}:{{ .Values.ttrss.image.tag }}"
+          imagePullPolicy: {{ .Values.ttrss.image.pullPolicy }}
+          ports:
+          - containerPort: 9000
+            name: ttrss
+            protocol: TCP
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 9000
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 9000
+            timeoutSeconds: 1
+          resources:
+            {{- toYaml .Values.ttrss.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/www/html
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "ttrss-helm.ttrss.fullname" . }}
+      {{- with .Values.ttrss.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.ttrss.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.ttrss.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ttrss-helm.ttrss.fullname" . }}-update-feed
+  labels:
+    {{- include "ttrss-helm.ttrss.feed.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "ttrss-helm.ttrss.feed.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ttrss-helm.ttrss.feed.selectorLabels" . | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      securityContext:
+        {{- toYaml .Values.ttrss.podSecurityContext | nindent 8 }}
+      containers:
+        - name: ttrss
+          securityContext:
+            {{- toYaml .Values.ttrss.securityContext | nindent 12 }}
+          image: "{{ .Values.ttrss.image.repository }}:{{ .Values.ttrss.image.tag }}"
+          imagePullPolicy: {{ .Values.ttrss.image.pullPolicy }}
+          command: 
+            - "/bin/sh"
+            - "-c"
+            - | 
+              while true;
+              do
+              [ -e /var/www/html/tt-rss/config.php ] && \      
+              sudo -u nobody -g '#101' /usr/bin/php \
+              /var/www/html/tt-rss/update_daemon2.php || \
+              sleep 60; 
+              done
+          resources:
+            {{- toYaml .Values.ttrss.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/www/html
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "ttrss-helm.ttrss.fullname" . }}
+      {{- with .Values.ttrss.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.ttrss.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.ttrss.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

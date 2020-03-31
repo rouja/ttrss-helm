@@ -1,0 +1,8 @@
+1. Here the db informations for the install html form :
+
+Database type: PostgreSQL
+Username: {{ required "A valid .Values.config.dbUser entry required!" .Values.config.dbUser }}
+Password: {{ required "A valid .Values.config.dbPass entry required!" .Values.config.dbPass }}
+Database name: {{ required "A valid .Values.config.dbName entry required!" .Values.config.dbName }}
+Host name: {{ include "ttrss-helm.pgsql.fullname" . }}
+Port: {{ .Values.pgsql.service.port }}

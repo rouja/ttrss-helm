@@ -1,0 +1,19 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "ttrss-helm.ttrss.fullname" . }}
+  labels:
+    {{- include "ttrss-helm.ttrss.labels" . | nindent 4 }}
+{{- if .Values.ttrss.persistence.annotations }}
+  annotations:
+{{ toYaml .Values.ttrss.persistence.annotations | indent 4 }}
+{{- end }}
+spec:
+  accessModes:
+    - {{ .Values.ttrss.persistence.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.ttrss.persistence.size | quote }}
+{{- if .Values.ttrss.persistence.storageClass }}
+  storageClassName: "{{ .Values.ttrss.persistence.storageClass }}"
+{{- end }}
